@@ -2,7 +2,6 @@ import sqlite3
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from init_db import init_db
 
 app = FastAPI()
 
@@ -236,4 +235,16 @@ async def get_order(order_id: int):
 
 @app.get("/item_list")
 def get_item_list():
-    return init_db.list_item_list()
+    (connection, cursor) = open_db()
+    rows = cursor.execute("SELECT order_id, item_id FROM item_list;").fetchall()
+    close_db(connection)
+    if rows:
+        item_list = []
+        for row in rows:
+            item_list.append({
+                "order_id": row[0],
+                "item_id": row[1]
+            })
+        return item_list
+    else:
+        raise HTTPException(status_code=404, detail="No item list entries found")
