@@ -1,0 +1,78 @@
+{
+    "Butter Masala Dosa": {
+        "orders": 3632,
+        "price": 12.95
+    },
+    "Butter Mysore Masala Dosa": {
+        "orders": 1220,
+        "price": 11.95
+    },
+    "Cheese & Onion Chilli Masala Dosa": {
+        "orders": 1200,
+        "price": 12.95
+    },
+    "Cheese Madurai Masala Dosa": {
+        "orders": 1232,
+        "price": 13.95
+    },
+    "Cheese Masala Dosa": {
+        "orders": 1172,
+        "price": 11.95
+    },
+    "Cheese Mysore Masala Dosa": {
+        "orders": 1219,
+        "price": 13.95
+    },
+    "Ghee Roast Masala Dosa": {
+        "orders": 1197,
+        "price": 11.95
+    },
+    "Gun Powder Dosa": {
+        "orders": 2461,
+        "price": 13.95
+    },
+    "Madurai Masala Dosa": {
+        "orders": 1239,
+        "price": 12.95
+    },
+    "Malgudi Onion Rava Masala Dosa": {
+        "orders": 1173,
+        "price": 14.95
+    },
+    "Masala Dosa": {
+        "orders": 4802,
+        "price": 10.95
+    },
+    "Mysore Masala Dosa": {
+        "orders": 1184,
+        "price": 11.95
+    },
+    "Onion Chilli Masala Dosa": {
+        "orders": 1234,
+        "price": 11.95
+    },
+    "Onion Chilli Rava Masala Dosa": {
+        "orders": 1236,
+        "price": 14.95
+    },
+    "Onion Rava Masala Dosa": {
+        "orders": 1136,
+        "price": 13.95
+    },
+    "Onion Rava Mysore Masala Dosa": {
+        "orders": 1152,
+        "price": 14.95
+    },
+    "Onion Rava Sada Dosa": {
+        "orders": 1205,
+        "price": 12.95
+    },
+    "Paper Masala Dosa": {
+        "orders": 1169,
+        "price": 11.95
+    },
+    "Sada Dosa": {
+        "orders": 1233,
+        "price": 9.95
+    }
+}
