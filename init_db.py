@@ -11,13 +11,13 @@ def init_db():
     CREATE TABLE IF NOT EXISTS customers(
         id INTEGER PRIMARY KEY,
         name CHAR(64) NOT NULL,
-        phone CHAR(10) NOT NULL
+        phone CHAR(10) NOT NULL UNIQUE
     );
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS items(
         id INTEGER PRIMARY KEY,
-        name CHAR(64) NOT NULL,
+        name CHAR(64) NOT NULL UNIQUE,
         price REAL NOT NULL
     );
     """)
@@ -33,6 +33,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS item_list(
         order_id NOT NULL,
         item_id NOT NULL,
+        UNIQUE(order_id, item_id),
         FOREIGN KEY(order_id) REFERENCES orders(id),
         FOREIGN KEY(item_id) REFERENCES items(id)
     );
@@ -40,19 +41,30 @@ def init_db():
 
     # Helper functions
     def add_customer(name, phone):
-        cursor.execute("INSERT INTO customers (name, phone) VALUES (?, ?);",
+        # Use INSERT OR IGNORE to avoid duplicates
+        cursor.execute("INSERT OR IGNORE INTO customers (name, phone) VALUES (?, ?);",
                        (name, phone))
 
     def add_item(name, price):
-        cursor.execute("INSERT INTO items (name, price) VALUES (?, ?);",
+        # Use INSERT OR IGNORE to avoid duplicates, then always get the ID
+        cursor.execute("INSERT OR IGNORE INTO items (name, price) VALUES (?, ?);",
                        (name, price))
+        # Always fetch the ID (whether inserted or already existed)
+        result = cursor.execute("SELECT id FROM items WHERE name = ?;", (name,)).fetchone()
+        return result[0]
 
     def add_order(timestamp, cust_id, notes):
+        # Check if order already exists and return its ID
+        existing_order = cursor.execute("SELECT id FROM orders WHERE timestamp = ? AND cust_id = ? AND notes = ?;", (timestamp, cust_id, notes)).fetchone()
+        if existing_order:
+            return existing_order[0]
         cursor.execute("INSERT INTO orders (timestamp, cust_id, notes) VALUES (?, ?, ?);",
                        (timestamp, cust_id, notes))
+        return cursor.lastrowid
 
     def add_item_list(order_id, item_id):
-        cursor.execute("INSERT INTO item_list (order_id, item_id) VALUES (?, ?);",
+        # Use INSERT OR IGNORE to avoid duplicates
+        cursor.execute("INSERT OR IGNORE INTO item_list (order_id, item_id) VALUES (?, ?);",
                        (order_id, item_id))
 
     def count_customers():
@@ -96,17 +108,10 @@ def init_db():
         name = order["name"]
         phone = order["phone"]
         cust_id = cursor.execute("SELECT id FROM customers WHERE phone = ?;", (phone,)).fetchone()[0]
-        add_order(timestamp, cust_id, notes)
-        order_id = cursor.lastrowid
-        items = cursor.execute("SELECT id, name, price FROM items;").fetchall()
+        order_id = add_order(timestamp, cust_id, notes)
         for item in order["items"]:
-            if item["name"] not in [item[1] for item in items]:
-                add_item(item["name"], item["price"])
-                item_id = cursor.lastrowid
-                add_item_list(order_id, item_id)
-            else:
-                item_id = cursor.execute("SELECT id FROM items WHERE name = ?;", (item["name"],)).fetchone()[0]
-                add_item_list(order_id, item_id)
+            item_id = add_item(item["name"], item["price"])
+            add_item_list(order_id, item_id)
     print(f"Added {count_orders()} orders to dosa.db")
     print(f"Added {count_item_list()} item list entries to dosa.db")
 

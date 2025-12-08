@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
+# Pydantic models
 class Customer(BaseModel):
     id: Optional[int] = None
     name: str
@@ -17,6 +18,7 @@ class Order(BaseModel):
     timestamp: Optional[int] = None
     items: List[int] = []
 
+# Utilities
 def open_db():
     connection = sqlite3.connect("dosa.db")
     cursor = connection.cursor()
@@ -25,12 +27,6 @@ def open_db():
 def close_db(connection):
     connection.commit()
     connection.close()
-
-def list_customers():
-    (connection, cursor) = open_db()
-    rows = cursor.execute("SELECT * FROM customers;").fetchall()
-    close_db(connection)
-    return rows
 
 async def get_order_items(cursor, order_id: int):
     items = cursor.execute("SELECT name, price FROM items, item_list WHERE id=item_id AND order_id=?;", (order_id,)).fetchall()
@@ -45,7 +41,7 @@ async def get_order_items(cursor, order_id: int):
     else:
         return []
 
-async def format_rows_to_dict(cursor, rows):
+async def format_order_rows_to_dict(cursor, rows):
     formatted_rows = []
     for row in rows:
         formatted_rows.append({
@@ -58,9 +54,12 @@ async def format_rows_to_dict(cursor, rows):
         })
     return formatted_rows
 
+# API endpoints
 @app.get("/customers")
 def get_customers():
-    rows = list_customers()
+    (connection, cursor) = open_db()
+    rows = cursor.execute("SELECT * FROM customers;").fetchall()
+    close_db(connection)
     if rows:
         customers = []
         for row in rows:
@@ -141,7 +140,7 @@ async def get_orders():
     (connection, cursor) = open_db()
     orders = cursor.execute("SELECT orders.id, timestamp, name, phone, notes FROM orders, customers WHERE customers.id=cust_id;").fetchall()
 
-    order_list = await format_rows_to_dict(cursor, orders)
+    order_list = await format_order_rows_to_dict(cursor, orders)
     close_db(connection)
     if order_list:
         return order_list
@@ -205,7 +204,7 @@ async def create_order(order: Order):
         WHERE customers.id=cust_id AND orders.id=?;
         """, (order_id,)).fetchone()
 
-        formatted_order = await format_rows_to_dict(cursor, [created_order])
+        formatted_order = await format_order_rows_to_dict(cursor, [created_order])
         close_db(connection)
 
         return formatted_order[0]
@@ -226,7 +225,7 @@ async def get_order(order_id: int):
     FROM orders, customers
     WHERE customers.id=cust_id AND orders.id=?;
     """, (order_id,)).fetchone()
-    order = await format_rows_to_dict(cursor, [order])
+    order = await format_order_rows_to_dict(cursor, [order])
     close_db(connection)
     if len(order) > 0:
         return order[0]
