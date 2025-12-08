@@ -11,6 +11,11 @@ class Customer(BaseModel):
     name: str
     phone: str
 
+class Item(BaseModel):
+    id: Optional[int] = None
+    name: str
+    price: float
+
 class Order(BaseModel):
     id: Optional[int] = None
     cust_id: int
@@ -55,22 +60,26 @@ async def format_order_rows_to_dict(cursor, rows):
     return formatted_rows
 
 # API endpoints
-@app.get("/customers")
-def get_customers():
-    (connection, cursor) = open_db()
-    rows = cursor.execute("SELECT * FROM customers;").fetchall()
-    close_db(connection)
-    if rows:
-        customers = []
-        for row in rows:
-            customers.append({
-                "id": row[0],
-                "name": row[1],
-                "phone": row[2]
-            })
-        return customers
-    else:
-        raise HTTPException(status_code=404, detail="No customers found")
+# Customers
+@app.post("/customers")
+def create_customer(customer: Customer):
+    try:
+        (connection, cursor) = open_db()
+        cursor.execute("INSERT INTO customers (name, phone) VALUES (?, ?);", (customer.name, customer.phone))
+        customer_id = cursor.lastrowid
+        created_customer = cursor.execute("SELECT * FROM customers WHERE id = ?;", (customer_id,)).fetchone()
+        close_db(connection)
+        return {
+            "id": created_customer[0],
+            "name": created_customer[1],
+            "phone": created_customer[2]
+        }
+    except sqlite3.IntegrityError as e:
+        close_db(connection)
+        raise HTTPException(status_code=400, detail=f"Error creating customer: Customer with this phone number already exists")
+    except Exception as e:
+        close_db(connection)
+        raise HTTPException(status_code=500, detail=f"Error creating customer: {str(e)}")
 
 @app.get("/customers/{customer_id}")
 def get_customer(customer_id: int):
@@ -88,10 +97,15 @@ def get_customer(customer_id: int):
 
 @app.put("/customers/{customer_id}")
 def update_customer(customer_id: int, customer: Customer):
-    if int(customer.id) != int(customer_id):
+    if customer.id is not None and int(customer.id) != int(customer_id):
         raise HTTPException(status_code=400, detail="Customer ID in path and body must match")
     try:
         (connection, cursor) = open_db()
+        # Check if customer exists
+        existing_customer = cursor.execute("SELECT * FROM customers WHERE id = ?;", (customer_id,)).fetchone()
+        if not existing_customer:
+            close_db(connection)
+            raise HTTPException(status_code=404, detail="Customer not found")
         cursor.execute("UPDATE customers SET name = ?, phone = ? WHERE id = ?;", (customer.name, customer.phone, customer_id))
         updated_customer = cursor.execute("SELECT * FROM customers WHERE id = ?;", (customer_id,)).fetchone()
         close_db(connection)
@@ -100,27 +114,58 @@ def update_customer(customer_id: int, customer: Customer):
             "name": updated_customer[1],
             "phone": updated_customer[2]
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating customer: {str(e)}")
-    finally:
+    except sqlite3.IntegrityError as e:
         close_db(connection)
+        raise HTTPException(status_code=400, detail=f"Error updating customer: Phone number must be unique")
+    except HTTPException:
+        raise
+    except Exception as e:
+        close_db(connection)
+        raise HTTPException(status_code=500, detail=f"Error updating customer: {str(e)}")
 
-@app.get("/items")
-def get_items():
-    (connection, cursor) = open_db()
-    rows = cursor.execute("SELECT * FROM items;").fetchall()
-    close_db(connection)
-    if rows:
-        items = []
-        for row in rows:
-            items.append({
-                "id": row[0],
-                "name": row[1],
-                "price": row[2]
-            })
-        return items
-    else:
-        raise HTTPException(status_code=404, detail="No items found")
+@app.delete("/customers/{customer_id}")
+def delete_customer(customer_id: int):
+    try:
+        (connection, cursor) = open_db()
+        # Check if customer exists
+        existing_customer = cursor.execute("SELECT * FROM customers WHERE id = ?;", (customer_id,)).fetchone()
+        if not existing_customer:
+            close_db(connection)
+            raise HTTPException(status_code=404, detail="Customer not found")
+        # Check if customer has orders
+        orders = cursor.execute("SELECT id FROM orders WHERE cust_id = ?;", (customer_id,)).fetchall()
+        if orders:
+            close_db(connection)
+            raise HTTPException(status_code=400, detail="Cannot delete customer with existing orders")
+        cursor.execute("DELETE FROM customers WHERE id = ?;", (customer_id,))
+        close_db(connection)
+        return {"message": "Customer deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        close_db(connection)
+        raise HTTPException(status_code=500, detail=f"Error deleting customer: {str(e)}")
+
+# Items
+@app.post("/items")
+def create_item(item: Item):
+    try:
+        (connection, cursor) = open_db()
+        cursor.execute("INSERT INTO items (name, price) VALUES (?, ?);", (item.name, item.price))
+        item_id = cursor.lastrowid
+        created_item = cursor.execute("SELECT * FROM items WHERE id = ?;", (item_id,)).fetchone()
+        close_db(connection)
+        return {
+            "id": created_item[0],
+            "name": created_item[1],
+            "price": created_item[2]
+        }
+    except sqlite3.IntegrityError as e:
+        close_db(connection)
+        raise HTTPException(status_code=400, detail=f"Error creating item: Item name must be unique")
+    except Exception as e:
+        close_db(connection)
+        raise HTTPException(status_code=500, detail=f"Error creating item: {str(e)}")
 
 @app.get("/items/{item_id}")
 def get_item(item_id: int):
@@ -133,20 +178,61 @@ def get_item(item_id: int):
             "name": row[1],
             "price": row[2]
         }
-    return 'Not implemented'
-
-@app.get("/orders")
-async def get_orders():
-    (connection, cursor) = open_db()
-    orders = cursor.execute("SELECT orders.id, timestamp, name, phone, notes FROM orders, customers WHERE customers.id=cust_id;").fetchall()
-
-    order_list = await format_order_rows_to_dict(cursor, orders)
-    close_db(connection)
-    if order_list:
-        return order_list
     else:
-        raise HTTPException(status_code=404, detail="No orders found")
+        raise HTTPException(status_code=404, detail="Item not found")
 
+@app.put("/items/{item_id}")
+def update_item(item_id: int, item: Item):
+    if item.id is not None and int(item.id) != int(item_id):
+        raise HTTPException(status_code=400, detail="Item ID in path and body must match")
+    try:
+        (connection, cursor) = open_db()
+        # Check if item exists
+        existing_item = cursor.execute("SELECT * FROM items WHERE id = ?;", (item_id,)).fetchone()
+        if not existing_item:
+            close_db(connection)
+            raise HTTPException(status_code=404, detail="Item not found")
+        cursor.execute("UPDATE items SET name = ?, price = ? WHERE id = ?;", (item.name, item.price, item_id))
+        updated_item = cursor.execute("SELECT * FROM items WHERE id = ?;", (item_id,)).fetchone()
+        close_db(connection)
+        return {
+            "id": updated_item[0],
+            "name": updated_item[1],
+            "price": updated_item[2]
+        }
+    except sqlite3.IntegrityError as e:
+        close_db(connection)
+        raise HTTPException(status_code=400, detail=f"Error updating item: Item name must be unique")
+    except HTTPException:
+        raise
+    except Exception as e:
+        close_db(connection)
+        raise HTTPException(status_code=500, detail=f"Error updating item: {str(e)}")
+
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int):
+    try:
+        (connection, cursor) = open_db()
+        # Check if item exists
+        existing_item = cursor.execute("SELECT * FROM items WHERE id = ?;", (item_id,)).fetchone()
+        if not existing_item:
+            close_db(connection)
+            raise HTTPException(status_code=404, detail="Item not found")
+        # Check if item is used in any orders
+        orders = cursor.execute("SELECT order_id FROM item_list WHERE item_id = ?;", (item_id,)).fetchall()
+        if orders:
+            close_db(connection)
+            raise HTTPException(status_code=400, detail="Cannot delete item that is used in existing orders")
+        cursor.execute("DELETE FROM items WHERE id = ?;", (item_id,))
+        close_db(connection)
+        return {"message": "Item deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        close_db(connection)
+        raise HTTPException(status_code=500, detail=f"Error deleting item: {str(e)}")
+
+# Orders
 @app.post("/orders")
 async def create_order(order: Order):
     (connection, cursor) = open_db()
@@ -225,6 +311,9 @@ async def get_order(order_id: int):
     FROM orders, customers
     WHERE customers.id=cust_id AND orders.id=?;
     """, (order_id,)).fetchone()
+    if not order:
+        close_db(connection)
+        raise HTTPException(status_code=404, detail="Order not found")
     order = await format_order_rows_to_dict(cursor, [order])
     close_db(connection)
     if len(order) > 0:
@@ -232,18 +321,98 @@ async def get_order(order_id: int):
     else:
         raise HTTPException(status_code=404, detail="Order not found")
 
-@app.get("/item_list")
-def get_item_list():
-    (connection, cursor) = open_db()
-    rows = cursor.execute("SELECT order_id, item_id FROM item_list;").fetchall()
-    close_db(connection)
-    if rows:
-        item_list = []
-        for row in rows:
-            item_list.append({
-                "order_id": row[0],
-                "item_id": row[1]
-            })
-        return item_list
-    else:
-        raise HTTPException(status_code=404, detail="No item list entries found")
+@app.put("/orders/{order_id}")
+async def update_order(order_id: int, order: Order):
+    if order.id is not None and int(order.id) != int(order_id):
+        raise HTTPException(status_code=400, detail="Order ID in path and body must match")
+    try:
+        (connection, cursor) = open_db()
+        # Check if order exists
+        existing_order = cursor.execute("SELECT * FROM orders WHERE id = ?;", (order_id,)).fetchone()
+        if not existing_order:
+            close_db(connection)
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Validate that the customer exists
+        customer = cursor.execute("SELECT id FROM customers WHERE id = ?;", (order.cust_id,)).fetchone()
+        if not customer:
+            close_db(connection)
+            raise HTTPException(status_code=404, detail="Customer not found")
+
+        # Validate that order has at least one item
+        if not order.items:
+            close_db(connection)
+            raise HTTPException(
+                status_code=400,
+                detail="Order must contain at least one item."
+            )
+
+        # Validate all item IDs exist
+        item_ids = order.items
+        placeholders = ','.join(['?'] * len(item_ids))
+        existing_items = cursor.execute(
+            f"SELECT id FROM items WHERE id IN ({placeholders});",
+            item_ids
+        ).fetchall()
+        existing_item_ids = {row[0] for row in existing_items}
+
+        # Check for invalid item IDs
+        invalid_item_ids = [item_id for item_id in item_ids if item_id not in existing_item_ids]
+        if invalid_item_ids:
+            close_db(connection)
+            raise HTTPException(
+                status_code=404,
+                detail=f"Invalid item IDs: {invalid_item_ids}"
+            )
+
+        # Update the order
+        cursor.execute("UPDATE orders SET cust_id = ?, notes = ? WHERE id = ?;",
+                      (order.cust_id, order.notes, order_id))
+
+        # Delete existing item_list entries for this order
+        cursor.execute("DELETE FROM item_list WHERE order_id = ?;", (order_id,))
+
+        # Insert new items into item_list
+        for item_id in order.items:
+            cursor.execute("INSERT INTO item_list (order_id, item_id) VALUES (?, ?);",
+                          (order_id, item_id))
+
+        # Fetch the updated order with customer details
+        updated_order = cursor.execute("""
+        SELECT orders.id, timestamp, name, phone, notes
+        FROM orders, customers
+        WHERE customers.id=cust_id AND orders.id=?;
+        """, (order_id,)).fetchone()
+
+        formatted_order = await format_order_rows_to_dict(cursor, [updated_order])
+        close_db(connection)
+
+        return formatted_order[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        close_db(connection)
+        raise HTTPException(status_code=500, detail=f"Error updating order: {str(e)}")
+
+@app.delete("/orders/{order_id}")
+async def delete_order(order_id: int):
+    try:
+        (connection, cursor) = open_db()
+        # Check if order exists
+        existing_order = cursor.execute("SELECT * FROM orders WHERE id = ?;", (order_id,)).fetchone()
+        if not existing_order:
+            close_db(connection)
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Delete item_list entries first (due to foreign key constraint)
+        cursor.execute("DELETE FROM item_list WHERE order_id = ?;", (order_id,))
+
+        # Delete the order
+        cursor.execute("DELETE FROM orders WHERE id = ?;", (order_id,))
+        close_db(connection)
+        return {"message": "Order deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        close_db(connection)
+        raise HTTPException(status_code=500, detail=f"Error deleting order: {str(e)}")
