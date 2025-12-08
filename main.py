@@ -20,7 +20,7 @@ class Order(BaseModel):
 
 # Utilities
 def open_db():
-    connection = sqlite3.connect("dosa.db")
+    connection = sqlite3.connect("db.sqlite")
     cursor = connection.cursor()
     return (connection, cursor)
 

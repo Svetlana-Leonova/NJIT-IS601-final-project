@@ -147,7 +147,7 @@ cython_debug/
 *.db
 *.sqlite
 *.sqlite3
-dosa.db
+db.sqlite
 
 # Large data files (uncomment if you don't want to commit these)
 # data/example_orders.json

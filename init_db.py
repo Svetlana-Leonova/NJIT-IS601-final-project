@@ -3,7 +3,7 @@ import json
 
 def init_db():
     # Open a connection to the database
-    connection = sqlite3.connect("dosa.db")
+    connection = sqlite3.connect("db.sqlite")
     cursor = connection.cursor()
 
     # Create empty tables
@@ -89,14 +89,14 @@ def init_db():
         customers = json.load(f)
     for phone, name in customers.items():
         add_customer(name, phone)
-    print(f"Added {count_customers()} customers to dosa.db")
+    print(f"Added {count_customers()} customers to db.sqlite")
 
     # Seed items
     with open("./data/items.json", "r") as f:
         items = json.load(f)
     for name, item in items.items():
         add_item(name, item["price"])
-    print(f"Added {count_items()} items to dosa.db")
+    print(f"Added {count_items()} items to db.sqlite")
 
     # Load data from example-orders.json
     with open("./data/example_orders.json", "r") as f:
@@ -112,8 +112,8 @@ def init_db():
         for item in order["items"]:
             item_id = add_item(item["name"], item["price"])
             add_item_list(order_id, item_id)
-    print(f"Added {count_orders()} orders to dosa.db")
-    print(f"Added {count_item_list()} item list entries to dosa.db")
+    print(f"Added {count_orders()} orders to db.sqlite")
+    print(f"Added {count_item_list()} item list entries to db.sqlite")
 
     # Commit the changes and close the connection
     connection.commit()
