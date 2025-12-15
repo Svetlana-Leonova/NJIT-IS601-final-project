@@ -4,6 +4,8 @@ import json
 def init_db():
     # Open a connection to the database
     connection = sqlite3.connect("db.sqlite")
+    # Ensure SQLite enforces foreign key constraints
+    connection.execute("PRAGMA foreign_keys = ON;")
     cursor = connection.cursor()
 
     # Create empty tables
@@ -38,6 +40,11 @@ def init_db():
         FOREIGN KEY(item_id) REFERENCES items(id)
     );
     """)
+
+    # Helpful indices for better query performance as data grows
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_cust_id ON orders(cust_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_item_list_order_id ON item_list(order_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_item_list_item_id ON item_list(item_id);")
 
     # Helper functions
     def add_customer(name, phone):

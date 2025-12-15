@@ -1,7 +1,7 @@
 import sqlite3
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 app = FastAPI()
 
@@ -21,11 +21,14 @@ class Order(BaseModel):
     cust_id: int
     notes: Optional[str] = None
     timestamp: Optional[int] = None
-    items: List[int] = []
+    # Use default_factory to avoid mutable default list being shared between instances
+    items: List[int] = Field(default_factory=list)
 
 # Utilities
 def open_db():
     connection = sqlite3.connect("db.sqlite")
+    # Ensure SQLite actually enforces foreign key constraints
+    connection.execute("PRAGMA foreign_keys = ON;")
     cursor = connection.cursor()
     return (connection, cursor)
 
@@ -33,8 +36,16 @@ def close_db(connection):
     connection.commit()
     connection.close()
 
-async def get_order_items(cursor, order_id: int):
-    items = cursor.execute("SELECT name, price FROM items, item_list WHERE id=item_id AND order_id=?;", (order_id,)).fetchall()
+def get_order_items(cursor, order_id: int):
+    items = cursor.execute(
+        """
+        SELECT i.name, i.price
+        FROM items AS i
+        JOIN item_list AS il ON i.id = il.item_id
+        WHERE il.order_id = ?;
+        """,
+        (order_id,),
+    ).fetchall()
     if items:
         formatted_items = []
         for item in items:
@@ -46,7 +57,7 @@ async def get_order_items(cursor, order_id: int):
     else:
         return []
 
-async def format_order_rows_to_dict(cursor, rows):
+def format_order_rows_to_dict(cursor, rows):
     formatted_rows = []
     for row in rows:
         formatted_rows.append({
@@ -55,7 +66,7 @@ async def format_order_rows_to_dict(cursor, rows):
             "name": row[2],
             "phone": row[3],
             "notes": row[4],
-            "items": await get_order_items(cursor, row[0])
+            "items": get_order_items(cursor, row[0])
         })
     return formatted_rows
 
@@ -234,7 +245,7 @@ def delete_item(item_id: int):
 
 # Orders
 @app.post("/orders")
-async def create_order(order: Order):
+def create_order(order: Order):
     (connection, cursor) = open_db()
 
     try:
@@ -285,12 +296,13 @@ async def create_order(order: Order):
 
         # Fetch the created order with customer details
         created_order = cursor.execute("""
-        SELECT orders.id, timestamp, name, phone, notes
-        FROM orders, customers
-        WHERE customers.id=cust_id AND orders.id=?;
+        SELECT o.id, o.timestamp, c.name, c.phone, o.notes
+        FROM orders AS o
+        JOIN customers AS c ON c.id = o.cust_id
+        WHERE o.id = ?;
         """, (order_id,)).fetchone()
 
-        formatted_order = await format_order_rows_to_dict(cursor, [created_order])
+        formatted_order = format_order_rows_to_dict(cursor, [created_order])
         close_db(connection)
 
         return formatted_order[0]
@@ -304,17 +316,18 @@ async def create_order(order: Order):
         raise HTTPException(status_code=500, detail=f"Error creating order: {str(e)}")
 
 @app.get("/orders/{order_id}")
-async def get_order(order_id: int):
+def get_order(order_id: int):
     (connection, cursor) = open_db()
     order = cursor.execute("""
-    SELECT orders.id, timestamp, name, phone, notes
-    FROM orders, customers
-    WHERE customers.id=cust_id AND orders.id=?;
+    SELECT o.id, o.timestamp, c.name, c.phone, o.notes
+    FROM orders AS o
+    JOIN customers AS c ON c.id = o.cust_id
+    WHERE o.id = ?;
     """, (order_id,)).fetchone()
     if not order:
         close_db(connection)
         raise HTTPException(status_code=404, detail="Order not found")
-    order = await format_order_rows_to_dict(cursor, [order])
+    order = format_order_rows_to_dict(cursor, [order])
     close_db(connection)
     if len(order) > 0:
         return order[0]
@@ -322,7 +335,7 @@ async def get_order(order_id: int):
         raise HTTPException(status_code=404, detail="Order not found")
 
 @app.put("/orders/{order_id}")
-async def update_order(order_id: int, order: Order):
+def update_order(order_id: int, order: Order):
     if order.id is not None and int(order.id) != int(order_id):
         raise HTTPException(status_code=400, detail="Order ID in path and body must match")
     try:
@@ -379,12 +392,13 @@ async def update_order(order_id: int, order: Order):
 
         # Fetch the updated order with customer details
         updated_order = cursor.execute("""
-        SELECT orders.id, timestamp, name, phone, notes
-        FROM orders, customers
-        WHERE customers.id=cust_id AND orders.id=?;
+        SELECT o.id, o.timestamp, c.name, c.phone, o.notes
+        FROM orders AS o
+        JOIN customers AS c ON c.id = o.cust_id
+        WHERE o.id = ?;
         """, (order_id,)).fetchone()
 
-        formatted_order = await format_order_rows_to_dict(cursor, [updated_order])
+        formatted_order = format_order_rows_to_dict(cursor, [updated_order])
         close_db(connection)
 
         return formatted_order[0]
@@ -395,7 +409,7 @@ async def update_order(order_id: int, order: Order):
         raise HTTPException(status_code=500, detail=f"Error updating order: {str(e)}")
 
 @app.delete("/orders/{order_id}")
-async def delete_order(order_id: int):
+def delete_order(order_id: int):
     try:
         (connection, cursor) = open_db()
         # Check if order exists
