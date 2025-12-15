@@ -28,6 +28,32 @@ class Item(BaseModel):
     name: str
     price: float
 
+    @field_validator("price")
+    @classmethod
+    def validate_price(cls, v: float) -> float:
+        """
+        Ensure price is provided as an integer or a dot-separated float.
+        If an integer is provided, it is stored as a float with .00.
+        """
+        # Pydantic will already coerce JSON numbers to float; here we guard against
+        # obviously bad formats like comma-separated strings, etc.
+        # Accept ints and floats, but reject strings that are not plain numbers.
+        if isinstance(v, (int, float)):
+            return float(v)
+
+        # If it's a string, only allow simple numeric representations using '.' as decimal separator
+        if isinstance(v, str):
+            if not re.fullmatch(r"\d+(\.\d+)?", v):
+                raise ValueError(
+                    "Price must be a number using a dot as the decimal separator, "
+                    "for example 10 or 10.99"
+                )
+            return float(v)
+
+        raise ValueError(
+            "Price must be an integer or a float using a dot as the decimal separator, for example 10 or 10.99"
+        )
+
 class Order(BaseModel):
     id: Optional[int] = None
     cust_id: int
