@@ -1,8 +1,9 @@
+import re
 import sqlite3
 from contextlib import contextmanager
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 app = FastAPI()
 
@@ -11,6 +12,16 @@ class Customer(BaseModel):
     id: Optional[int] = None
     name: str
     phone: str
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        """
+        Enforce phone numbers in the format 111-111-1111 (US-style).
+        """
+        if not re.fullmatch(r"\d{3}-\d{3}-\d{4}", v):
+            raise ValueError("Phone number must be entered in the following format: 111-111-1111")
+        return v
 
 class Item(BaseModel):
     id: Optional[int] = None

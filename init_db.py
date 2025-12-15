@@ -13,7 +13,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS customers(
         id INTEGER PRIMARY KEY,
         name CHAR(64) NOT NULL,
-        phone CHAR(10) NOT NULL UNIQUE
+        phone CHAR(12) NOT NULL UNIQUE
     );
     """)
     cursor.execute("""
