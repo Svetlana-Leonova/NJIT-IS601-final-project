@@ -39,6 +39,13 @@ def test_create_order_invalid_item_id(client):
     assert resp.status_code == 404
     assert "Invalid item IDs" in resp.json()["detail"]
 
+def test_create_order_invalid_customer_id(client):
+    """Test that creating an order with a non-existent customer ID returns 404 Not Found."""
+    order_payload = {"cust_id": 999999, "notes": "Bad order", "items": [1]}
+    resp = client.post("/orders", json=order_payload)
+    assert resp.status_code == 404
+    assert "Customer not found" in resp.json()["detail"]
+
 def test_get_order_happy_path(client):
     """Test that fetching an order returns 200 OK."""
     resp = client.get("/orders/1")
@@ -93,6 +100,12 @@ def test_update_order_no_items_returns_400(client):
     resp = client.put("/orders/1", json={"cust_id": 1, "notes": "Updated order", "items": []})
     assert resp.status_code == 400
     assert "Order must contain at least one item." in resp.json()["detail"]
+
+def test_update_order_invalid_customer_id(client):
+    """Test that updating an order with a non-existent customer ID returns 404 Not Found."""
+    resp = client.put("/orders/1", json={"cust_id": 999999, "notes": "Updated order", "items": [1]})
+    assert resp.status_code == 404
+    assert "Customer not found" in resp.json()["detail"]
 
 def test_delete_order_happy_path(client):
     """Test that deleting an order returns 200 OK."""
