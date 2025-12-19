@@ -1,9 +1,16 @@
+import os
 import sqlite3
 import json
 
+
+def get_db_path():
+    """Get the database path from environment variable, defaulting to 'db.sqlite'."""
+    return os.getenv("DB_PATH", "db.sqlite")
+
+
 def init_db():
     # Open a connection to the database
-    connection = sqlite3.connect("db.sqlite")
+    connection = sqlite3.connect(get_db_path())
     # Ensure SQLite enforces foreign key constraints
     connection.execute("PRAGMA foreign_keys = ON;")
     cursor = connection.cursor()
@@ -96,14 +103,15 @@ def init_db():
         customers = json.load(f)
     for phone, name in customers.items():
         add_customer(name, phone)
-    print(f"Added {count_customers()} customers to db.sqlite")
+    db_path = get_db_path()
+    print(f"Added {count_customers()} customers to {db_path}")
 
     # Seed items
     with open("./data/items.json", "r") as f:
         items = json.load(f)
     for name, item in items.items():
         add_item(name, item["price"])
-    print(f"Added {count_items()} items to db.sqlite")
+    print(f"Added {count_items()} items to {db_path}")
 
     # Load data from example-orders.json
     with open("./data/example_orders.json", "r") as f:
@@ -119,12 +127,13 @@ def init_db():
         for item in order["items"]:
             item_id = add_item(item["name"], item["price"])
             add_item_list(order_id, item_id)
-    print(f"Added {count_orders()} orders to db.sqlite")
-    print(f"Added {count_item_list()} item list entries to db.sqlite")
+    print(f"Added {count_orders()} orders to {db_path}")
+    print(f"Added {count_item_list()} item list entries to {db_path}")
 
     # Commit the changes and close the connection
     connection.commit()
     connection.close()
+
 
 if __name__ == "__main__":
     init_db()

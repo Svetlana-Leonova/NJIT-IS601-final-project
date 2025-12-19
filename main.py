@@ -1,3 +1,4 @@
+import os
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -6,6 +7,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 app = FastAPI()
+
+
+def get_db_path():
+    """Get the database path from environment variable, defaulting to 'db.sqlite'."""
+    return os.getenv("DB_PATH", "db.sqlite")
+
 
 # Pydantic models
 class Customer(BaseModel):
@@ -22,6 +29,7 @@ class Customer(BaseModel):
         if not re.fullmatch(r"\d{3}-\d{3}-\d{4}", v):
             raise ValueError("Phone number must be entered in the following format: 111-111-1111")
         return v
+
 
 class Item(BaseModel):
     id: Optional[int] = None
@@ -54,6 +62,7 @@ class Item(BaseModel):
             "Price must be an integer or a float using a dot as the decimal separator, for example 10 or 10.99"
         )
 
+
 class Order(BaseModel):
     id: Optional[int] = None
     cust_id: int
@@ -70,7 +79,7 @@ def db_connection():
     Context manager that opens an SQLite connection with foreign key enforcement,
     yields (connection, cursor), and handles commit/rollback and close.
     """
-    connection = sqlite3.connect("db.sqlite")
+    connection = sqlite3.connect(get_db_path())
     # Ensure SQLite actually enforces foreign key constraints
     connection.execute("PRAGMA foreign_keys = ON;")
     cursor = connection.cursor()
@@ -82,6 +91,7 @@ def db_connection():
         raise
     finally:
         connection.close()
+
 
 def get_order_items(cursor, order_id: int):
     items = cursor.execute(
@@ -104,6 +114,7 @@ def get_order_items(cursor, order_id: int):
     else:
         return []
 
+
 def format_order_rows_to_dict(cursor, rows):
     formatted_rows = []
     for row in rows:
@@ -116,6 +127,7 @@ def format_order_rows_to_dict(cursor, rows):
             "items": get_order_items(cursor, row[0])
         })
     return formatted_rows
+
 
 # API endpoints
 # Customers
@@ -141,6 +153,7 @@ def create_customer(customer: Customer):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating customer: {str(e)}")
 
+
 @app.get("/customers/{customer_id}")
 def get_customer(customer_id: int):
     with db_connection() as (connection, cursor):
@@ -155,6 +168,7 @@ def get_customer(customer_id: int):
         }
     else:
         raise HTTPException(status_code=404, detail="Customer not found")
+
 
 @app.put("/customers/{customer_id}")
 def update_customer(customer_id: int, customer: Customer):
@@ -187,6 +201,7 @@ def update_customer(customer_id: int, customer: Customer):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating customer: {str(e)}")
 
+
 @app.delete("/customers/{customer_id}")
 def delete_customer(customer_id: int):
     try:
@@ -213,6 +228,7 @@ def delete_customer(customer_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting customer: {str(e)}")
 
+
 # Items
 @app.post("/items")
 def create_item(item: Item):
@@ -236,6 +252,7 @@ def create_item(item: Item):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating item: {str(e)}")
 
+
 @app.get("/items/{item_id}")
 def get_item(item_id: int):
     with db_connection() as (connection, cursor):
@@ -250,6 +267,7 @@ def get_item(item_id: int):
         }
     else:
         raise HTTPException(status_code=404, detail="Item not found")
+
 
 @app.put("/items/{item_id}")
 def update_item(item_id: int, item: Item):
@@ -282,6 +300,7 @@ def update_item(item_id: int, item: Item):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating item: {str(e)}")
 
+
 @app.delete("/items/{item_id}")
 def delete_item(item_id: int):
     try:
@@ -307,6 +326,7 @@ def delete_item(item_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting item: {str(e)}")
+
 
 # Orders
 @app.post("/orders")
@@ -380,6 +400,7 @@ def create_order(order: Order):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating order: {str(e)}")
 
+
 @app.get("/orders/{order_id}")
 def get_order(order_id: int):
     with db_connection() as (connection, cursor):
@@ -399,6 +420,7 @@ def get_order(order_id: int):
         return order[0]
     else:
         raise HTTPException(status_code=404, detail="Order not found")
+
 
 @app.put("/orders/{order_id}")
 def update_order(order_id: int, order: Order):
@@ -480,6 +502,7 @@ def update_order(order_id: int, order: Order):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating order: {str(e)}")
+
 
 @app.delete("/orders/{order_id}")
 def delete_order(order_id: int):

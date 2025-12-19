@@ -28,7 +28,7 @@ The application uses four main tables:
 
    - `id` (INTEGER PRIMARY KEY)
    - `name` (CHAR(64) NOT NULL)
-   - `phone` (CHAR(10) NOT NULL UNIQUE)
+   - `phone` (CHAR(12) NOT NULL UNIQUE) - Format: `111-111-1111`
 
 2. **items**: Stores menu items
 
@@ -164,7 +164,7 @@ The API will be available at:
 # Create a customer
 curl -X POST "http://localhost:8000/customers" \
   -H "Content-Type: application/json" \
-  -d '{"name": "John Doe", "phone": "5551234567"}'
+  -d '{"name": "John Doe", "phone": "555-123-4567"}'
 
 # Get a customer
 curl "http://localhost:8000/customers/1"
@@ -190,7 +190,7 @@ BASE_URL = "http://localhost:8000"
 # Create a customer
 customer = requests.post(
     f"{BASE_URL}/customers",
-    json={"name": "John Doe", "phone": "5551234567"}
+    json={"name": "John Doe", "phone": "555-123-4567"}
 )
 print(customer.json())
 
@@ -224,6 +224,7 @@ Error responses include a `detail` field with a descriptive error message:
 
 - **Customers**:
 
+  - Phone numbers must be in the format `111-111-1111` (US-style with dashes)
   - Phone numbers must be unique
   - Cannot delete customers with existing orders
 
@@ -251,12 +252,80 @@ rm db.sqlite
 python init_db.py
 ```
 
-### Testing the API
+### Automated Testing
 
-You can test the API using:
+The project includes a comprehensive test suite using `pytest` and FastAPI's `TestClient`. Tests use isolated temporary databases, so they won't affect your development database.
+
+#### Running Tests
+
+To run all tests:
+
+```bash
+pytest
+```
+
+To run tests with verbose output (shows test descriptions):
+
+```bash
+pytest -v
+```
+
+To run only tests matching a pattern:
+
+```bash
+# Run only customer-related tests
+pytest -v -k "customer"
+
+# Run only item-related tests
+pytest -v -k "item"
+```
+
+To see test output and print statements:
+
+```bash
+pytest -v -s
+```
+
+#### Test Coverage
+
+The test suite includes:
+
+- **Customer Tests** (`tests/test_customers.py`):
+
+  - Successful customer creation with valid phone format
+  - Validation error for invalid phone format (must be `111-111-1111`)
+  - 404 error when fetching non-existent customers
+
+- **Item and Order Tests** (`tests/test_items_orders.py`):
+  - Integer prices are accepted and stored as floats
+  - Validation error for invalid price formats (comma-separated, etc.)
+  - Complete order creation flow (customer → item → order)
+  - Error handling for invalid item IDs in orders
+
+#### Test Structure
+
+- **`tests/conftest.py`**: Contains the `client` fixture that provides an isolated test database for each test
+- **`tests/test_*.py`**: Individual test files organized by functionality
+- Each test uses a temporary SQLite database that is automatically cleaned up after the test completes
+
+#### Writing New Tests
+
+To add new tests, create functions starting with `test_` in the appropriate test file:
+
+```python
+def test_your_new_feature(client):
+    """Description of what this test verifies."""
+    # Your test code here
+    response = client.post("/your-endpoint", json={"key": "value"})
+    assert response.status_code == 200
+```
+
+### Manual Testing
+
+You can also test the API manually using:
 
 1. **Swagger UI**: Visit `http://localhost:8000/docs` for an interactive API explorer
 2. **ReDoc**: Visit `http://localhost:8000/redoc` for alternative documentation
 3. **cURL**: Use command-line tools as shown in examples above
 4. **Postman**: Import the API endpoints for testing
-5. **Python requests**: Use the requests library as shown in exampless
+5. **Python requests**: Use the requests library as shown in examples above

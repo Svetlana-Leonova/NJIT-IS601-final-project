@@ -2,7 +2,9 @@
 fastapi[standard]>=0.111.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.5.0
+pytest>=8.0.0
 
 # Note: To create a freeze file with exact versions of all installed packages, run:
 # pip freeze > requirements-freeze.txt
 # This will capture all transitive dependencies for exact reproducibility
+
