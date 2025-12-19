@@ -76,14 +76,10 @@ venv\Scripts\activate
 
 ### Step 3: Install Dependencies
 
+For convenience, requirements.txt file contains a list of all dependencies required for running the API. To automatically install all dependencies, you can run the following command:
+
 ```bash
 pip install -r requirements.txt
-```
-
-If `requirements.txt` doesn't exist, install dependencies manually:
-
-```bash
-pip install fastapi uvicorn[standard]
 ```
 
 ### Optional: Create a Freeze File for Exact Reproducibility
@@ -285,22 +281,6 @@ To see test output and print statements:
 ```bash
 pytest -v -s
 ```
-
-#### Test Coverage
-
-The test suite includes:
-
-- **Customer Tests** (`tests/test_customers.py`):
-
-  - Successful customer creation with valid phone format
-  - Validation error for invalid phone format (must be `111-111-1111`)
-  - 404 error when fetching non-existent customers
-
-- **Item and Order Tests** (`tests/test_items_orders.py`):
-  - Integer prices are accepted and stored as floats
-  - Validation error for invalid price formats (comma-separated, etc.)
-  - Complete order creation flow (customer → item → order)
-  - Error handling for invalid item IDs in orders
 
 #### Test Structure
 
